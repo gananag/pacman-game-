@@ -1,118 +1,99 @@
 import pygame
 import sys
-import random
 
-# Initialize Pygame
+# Initialize pygame
 pygame.init()
 
-# Set up some constants
-WIDTH = 800
-HEIGHT = 600
-PACMAN_SIZE = 50
-PACMAN_SPEED = 5
-GHOST_SIZE = 50
-GHOST_SPEED = 3
-PELLET_SIZE = 10
+# Constants
+WIDTH, HEIGHT = 600, 600
+GRID_SIZE = 20
+CELL_SIZE = WIDTH // GRID_SIZE
+FPS = 10
 
-# Set up some colors
+# Colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 YELLOW = (255, 255, 0)
-RED = (255, 0, 0)
+BLUE = (0, 0, 255)
 
-# Set up the display
-SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
+# Directions
+UP = (0, -1)
+DOWN = (0, 1)
+LEFT = (-1, 0)
+RIGHT = (1, 0)
 
-# Set up the font
-FONT = pygame.font.Font(None, 36)
+# Initial grid setup
+def initial_grid():
+    grid = [[0] * GRID_SIZE for _ in range(GRID_SIZE)]
+    # Add walls
+    for i in range(GRID_SIZE):
+        grid[0][i] = 1  # Top wall
+        grid[GRID_SIZE - 1][i] = 1  # Bottom wall
+        grid[i][0] = 1  # Left wall
+        grid[i][GRID_SIZE - 1] = 1  # Right wall
+    # Add some inner walls
+    for i in range(5, 15):
+        grid[5][i] = 1
+        grid[14][i] = 1
+    # Add dots
+    for i in range(1, GRID_SIZE - 1):
+        for j in range(1, GRID_SIZE - 1):
+            if grid[i][j] != 1:
+                grid[i][j] = 2
+    # Pacman starting position
+    grid[10][10] = 3
+    return grid
 
-# Set up the clock
-CLOCK = pygame.time.Clock()
+# Draw the grid
+def draw_grid(screen, grid):
+    for y in range(GRID_SIZE):
+        for x in range(GRID_SIZE):
+            rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            if grid[y][x] == 1:  # Wall
+                pygame.draw.rect(screen, BLUE, rect)
+            elif grid[y][x] == 2:  # Dot
+                pygame.draw.circle(screen, YELLOW, rect.center, CELL_SIZE // 4)
+            elif grid[y][x] == 3:  # Pacman
+                pygame.draw.circle(screen, YELLOW, rect.center, CELL_SIZE // 2)
 
-# Set up the Pacman
-PACMAN = pygame.Rect(WIDTH / 2, HEIGHT / 2, PACMAN_SIZE, PACMAN_SIZE)
+# Main game loop
+def main():
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Pacman Game")
+    clock = pygame.time.Clock()
 
-# Set up the ghosts
-GHOSTS = [
-    pygame.Rect(100, 100, GHOST_SIZE, GHOST_SIZE),
-    pygame.Rect(300, 300, GHOST_SIZE, GHOST_SIZE),
-    pygame.Rect(500, 500, GHOST_SIZE, GHOST_SIZE),
-]
+    grid = initial_grid()
+    pacman_position = (10, 10)
+    score = 0
+    direction = RIGHT
 
-# Set up the pellets
-PELLETS = []
-for _ in range(100):
-    PELLETS.append(pygame.Rect(random.randint(0, WIDTH - PELLET_SIZE), random.randint(0, HEIGHT - PELLET_SIZE), PELLET_SIZE, PELLET_SIZE))
+    while True:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    direction = UP
+                elif event.key == pygame.K_DOWN:
+                    direction = DOWN
+                elif event.key == pygame.K_LEFT:
+                    direction = LEFT
+                elif event.key == pygame.K_RIGHT:
+                    direction = RIGHT
 
-# Set up the score
-SCORE = 0
+        new_position = (pacman_position[0] + direction[0], pacman_position[1] + direction[1])
+        if 0 <= new_position[0] < GRID_SIZE and 0 <= new_position[1] < GRID_SIZE and grid[new_position[1]][new_position[0]] != 1:
+            grid[pacman_position[1]][pacman_position[0]] = 0
+            pacman_position = new_position
+            if grid[pacman_position[1]][pacman_position[0]] == 2:
+                score += 1
+            grid[pacman_position[1]][pacman_position[0]] = 3
 
-# Game loop
-while True:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+        screen.fill(BLACK)
+        draw_grid(screen, grid)
+        pygame.display.flip()
+        clock.tick(FPS)
 
-    # Get the pressed keys
-    keys = pygame.key.get_pressed()
-
-    # Move the Pacman
-    if keys[pygame.K_UP]:
-        PACMAN.y -= PACMAN_SPEED
-    if keys[pygame.K_DOWN]:
-        PACMAN.y += PACMAN_SPEED
-    if keys[pygame.K_LEFT]:
-        PACMAN.x -= PACMAN_SPEED
-    if keys[pygame.K_RIGHT]:
-        PACMAN.x += PACMAN_SPEED
-
-    # Keep the Pacman inside the screen
-    if PACMAN.x < 0:
-        PACMAN.x = 0
-    if PACMAN.x > WIDTH - PACMAN_SIZE:
-        PACMAN.x = WIDTH - PACMAN_SIZE
-    if PACMAN.y < 0:
-        PACMAN.y = 0
-    if PACMAN.y > HEIGHT - PACMAN_SIZE:
-        PACMAN.y = HEIGHT - PACMAN_SIZE
-
-    # Move the ghosts
-    for ghost in GHOSTS:
-        if ghost.x < PACMAN.x:
-            ghost.x += GHOST_SPEED
-        if ghost.x > PACMAN.x:
-            ghost.x -= GHOST_SPEED
-        if ghost.y < PACMAN.y:
-            ghost.y += GHOST_SPEED
-        if ghost.y > PACMAN.y:
-            ghost.y -= GHOST_SPEED
-
-    # Check for collisions with the ghosts
-    for ghost in GHOSTS:
-        if PACMAN.colliderect(ghost):
-            print("Game Over")
-            pygame.quit()
-            sys.exit()
-
-    # Check for collisions with the pellets
-    for pellet in PELLETS[:]:
-        if PACMAN.colliderect(pellet):
-            PELLETS.remove(pellet)
-            SCORE += 1
-
-    # Draw everything
-    SCREEN.fill(BLACK)
-    pygame.draw.rect(SCREEN, YELLOW, PACMAN)
-    for ghost in GHOSTS:
-        pygame.draw.rect(SCREEN, RED, ghost)
-    for pellet in PELLETS:
-        pygame.draw.rect(SCREEN, WHITE, pellet)
-    text = FONT.render(f"Score: {SCORE}", True, WHITE)
-    SCREEN.blit(text, (10, 10))
-
-    # Update the display
-    pygame.display.flip()
-
-    # Cap the frame rate
-    CLOCK.tick(60)
+if __name__ == "__main__":
+    main()
